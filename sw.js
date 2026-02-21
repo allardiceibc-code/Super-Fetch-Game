@@ -1,4 +1,4 @@
-const cacheName = 'fetch-game-v1';
+const cacheName = 'fetch-game-v3';
 const assets = [
   './index.html',
   './manifest.json',
