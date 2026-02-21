@@ -2,58 +2,67 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Super Fetch: Pro Edition</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; touch-action: none; }
-        canvas { display: block; background: #90EE90; border-bottom: 50px solid #556B2F; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; touch-action: none; -webkit-user-select: none; }
+        canvas { display: block; background: #90EE90; border-bottom: 50px solid #556B2F; touch-action: none; }
         
-        /* UI Elements */
         #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px #000; pointer-events: none; z-index: 10; }
         .btn-round {
-            position: absolute; top: 20px; background: rgba(0,0,0,0.5);
+            position: absolute; top: 20px; background: rgba(0,0,0,0.6);
             border: 2px solid white; color: white; border-radius: 50%; cursor: pointer;
-            font-size: 20px; width: 45px; height: 45px; display: flex;
+            font-size: 20px; width: 50px; height: 50px; display: flex;
             align-items: center; justify-content: center; pointer-events: auto; z-index: 20;
         }
         #mute-btn { right: 20px; }
-        #pause-btn { right: 75px; }
+        #pause-btn { right: 80px; }
         
+        /* Power Meter Styling */
+        #power-container {
+            display: none; position: absolute; bottom: 80px; left: 50%;
+            transform: translateX(-50%); width: 200px; height: 20px;
+            background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 10px; overflow: hidden;
+        }
+        #power-bar { width: 0%; height: 100%; background: linear-gradient(to right, #ffff00, #ff0000); }
+
         #pause-overlay {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); color: white; align-items: center; 
             justify-content: center; font-size: 3rem; font-weight: bold; z-index: 15;
         }
 
-        .bar-container { width: 200px; height: 15px; background: #333; border: 2px solid #fff; margin-top: 5px; }
-        #stamina-bar { width: 100%; height: 100%; background: #00FF00; transition: width 0.1s; }
+        .bar-container { width: 180px; height: 12px; background: #333; border: 2px solid #fff; margin-top: 5px; }
+        #stamina-bar { width: 100%; height: 100%; background: #00FF00; }
         
         #game-over { 
             display: none; position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%); text-align: center; 
-            background: rgba(0,0,0,0.9); color: white; padding: 40px; 
-            border-radius: 20px; border: 4px solid gold; z-index: 30;
+            background: rgba(0,0,0,0.9); color: white; padding: 30px; 
+            border-radius: 20px; border: 4px solid gold; z-index: 30; width: 280px;
         }
         
-        #version-tag { position: absolute; bottom: 60px; right: 10px; color: rgba(255,255,255,0.6); font-size: 12px; }
-        button { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; background: gold; border: none; border-radius: 10px; font-weight: bold; margin-top: 10px; }
+        #version-tag { position: absolute; bottom: 60px; right: 10px; color: rgba(255,255,255,0.6); font-size: 10px; }
+        button { padding: 12px 24px; font-size: 1rem; cursor: pointer; background: gold; border: none; border-radius: 10px; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>Score: <span id="score">0</span> | Best: <span id="highScore">0</span></h1>
-        <h2>Time: <span id="timer">60</span>s</h2>
+        <div style="font-size: 1.2rem; font-weight: bold;">Score: <span id="score">0</span> | Best: <span id="highScore">0</span></div>
+        <div style="font-size: 1rem;">Time: <span id="timer">60</span>s</div>
         <div class="bar-container"><div id="stamina-bar"></div></div>
     </div>
 
-    <div id="pause-btn" class="btn-round" onclick="togglePause()">⏸</div>
-    <div id="mute-btn" class="btn-round" onclick="toggleMute()">🔊</div>
+    <div id="power-container"><div id="power-bar"></div></div>
+
+    <div id="pause-btn" class="btn-round" onclick="event.stopPropagation(); togglePause();">⏸</div>
+    <div id="mute-btn" class="btn-round" onclick="event.stopPropagation(); toggleMute();">🔊</div>
     <div id="pause-overlay">PAUSED</div>
-    <div id="version-tag">v1.1.0</div>
+    <div id="version-tag">v1.2.0</div>
 
     <div id="game-over">
-        <h1 id="status-title">GAME OVER!</h1>
+        <h1 id="status-title" style="margin: 0;">GAME OVER!</h1>
         <h2 id="finalScoreDisplay">Score: 0</h2>
         <button onclick="location.reload()">Play Again</button>
     </div>
@@ -65,20 +74,18 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score'), highScoreEl = document.getElementById('highScore');
 const timerEl = document.getElementById('timer'), staminaBar = document.getElementById('stamina-bar');
-const gameOverScreen = document.getElementById('game-over');
-const pauseOverlay = document.getElementById('pause-overlay');
+const powerContainer = document.getElementById('power-container'), powerBar = document.getElementById('power-bar');
+const gameOverScreen = document.getElementById('game-over'), pauseOverlay = document.getElementById('pause-overlay');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Assets
 const dogImg = new Image(); dogImg.src = 'https://cdn-icons-png.flaticon.com/512/620/620851.png';
 const ballImg = new Image(); ballImg.src = 'https://cdn-icons-png.flaticon.com/512/33/33736.png';
 const treatImg = new Image(); treatImg.src = 'https://cdn-icons-png.flaticon.com/512/1046/1046804.png';
 const barkSound = new Audio('https://codesandbox.io/api/v1/sandboxes/f8z7l/assets/bark.mp3');
 
-// State
-let score = 0, timeLeft = 60, gameActive = true, power = 0, isPoweringUp = false, isMuted = false, isPaused = false;
+let score = 0, timeLeft = 60, gameActive = true, power = 0, maxPower = 25, isPoweringUp = false, isMuted = false, isPaused = false;
 let highStored = localStorage.getItem('fetchHighScore') || 0;
 highScoreEl.innerText = highStored;
 
@@ -126,49 +133,41 @@ function spawnTreat() {
 
 function draw() {
     if (!gameActive) return;
-    
-    if (!isPaused) {
-        update();
-    }
-    
+    if (!isPaused) update();
     render();
     requestAnimationFrame(draw);
 }
 
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Obstacle
     ctx.fillStyle = '#1e5d1e';
     ctx.beginPath(); ctx.arc(obstacle.x + 35, obstacle.y + 35, 35, 0, Math.PI * 2); ctx.fill();
-
-    // Treat
     if (treat.active) {
         ctx.shadowBlur = 15; ctx.shadowColor = "gold";
         ctx.drawImage(treatImg, treat.x, treat.y, treat.w, treat.h);
         ctx.shadowBlur = 0;
     }
-
-    // Ball
     ctx.drawImage(ballImg, ball.x - ball.radius, ball.y - ball.radius, ball.radius*2, ball.radius*2);
-
-    // Dog
     ctx.save();
     if (dog.state === 'returning') {
         ctx.translate(dog.x + dog.w, dog.y); ctx.scale(-1, 1);
         ctx.drawImage(dogImg, 0, 0, dog.w, dog.h);
     } else { ctx.drawImage(dogImg, dog.x, dog.y, dog.w, dog.h); }
     ctx.restore();
+
+    // Show/Update Power Meter UI
+    if (isPoweringUp) {
+        powerContainer.style.display = 'block';
+        powerBar.style.width = (power / maxPower) * 100 + "%";
+    } else {
+        powerContainer.style.display = 'none';
+    }
 }
 
 function update() {
     let speed = dog.stamina > 25 ? dog.baseSpeed : 3;
-
-    // Obstacle Movement
     obstacle.x += obstacle.speed * obstacle.dir;
     if (obstacle.x > canvas.width - 200 || obstacle.x < 300) obstacle.dir *= -1;
-
-    // Ball Physics
     if (ball.active) {
         ball.vy += 0.5; ball.x += ball.vx; ball.y += ball.vy;
         if (ball.y > canvas.height - 100) {
@@ -176,8 +175,6 @@ function update() {
             if (Math.abs(ball.vx) < 0.5) { ball.active = false; dog.state = 'chasing'; }
         }
     }
-
-    // Dog Logic
     if (dog.state !== 'idle') {
         dog.stamina -= 0.15;
         if (treat.active && dog.x + dog.w > treat.x && dog.x < treat.x + treat.w) {
@@ -200,29 +197,37 @@ function update() {
                 obstacle.speed += 0.4; spawnTreat(); resetBall();
             }
         }
-        // Jumping
         if (dog.x + dog.w > obstacle.x && dog.x < obstacle.x + obstacle.w) {
             if (dog.y !== canvas.height - 250 && !isMuted && navigator.vibrate) navigator.vibrate(10);
             dog.y = canvas.height - 250;
         } else { dog.y = canvas.height - 130; }
     } else if (dog.stamina < 100) { dog.stamina += 0.4; }
-
     staminaBar.style.width = dog.stamina + "%";
     staminaBar.style.background = dog.stamina > 30 ? "#00FF00" : "#FF0000";
 }
 
 function resetBall() { ball.x = 80; ball.y = canvas.height - 100; ball.active = false; }
 
-window.onmousedown = () => { if(gameActive && !isPaused && dog.state === 'idle') isPoweringUp = true; };
-window.onmouseup = () => {
-    if (isPoweringUp) { ball.vx = power * 1.5; ball.vy = -power * 1.2; ball.active = true; }
-    isPoweringUp = false; power = 0;
-};
-setInterval(() => { if (isPoweringUp && power < 25) power += 1.5; }, 30);
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+function handleStart(e) {
+    if(gameActive && !isPaused && dog.state === 'idle') {
+        isPoweringUp = true;
+        if(e && e.cancelable) e.preventDefault();
+    }
 }
+function handleEnd() {
+    if (isPoweringUp) {
+        ball.vx = power * 1.5; ball.vy = -power * 1.2; ball.active = true;
+    }
+    isPoweringUp = false; power = 0;
+}
+
+window.addEventListener('mousedown', handleStart);
+window.addEventListener('mouseup', handleEnd);
+window.addEventListener('touchstart', (e) => { handleStart(e); }, { passive: false });
+window.addEventListener('touchend', (e) => { handleEnd(); }, { passive: false });
+
+setInterval(() => { if (isPoweringUp && power < maxPower) power += 1.2; }, 30);
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js')); }
 draw();
 </script>
 </body>
