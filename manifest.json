@@ -1,0 +1,16 @@
+{
+  "short_name": "FetchPro",
+  "name": "Super Fetch: Pro Edition",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/620/620851.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#90EE90",
+  "theme_color": "#556B2F",
+  "orientation": "landscape"
+}
