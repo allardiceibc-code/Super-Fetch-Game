@@ -9,39 +9,34 @@
         body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; touch-action: none; }
         canvas { display: block; background: #90EE90; border-bottom: 50px solid #556B2F; }
         
-        /* UI Overlay */
-        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px #000; pointer-events: none; }
-        #mute-btn {
-            position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.5);
+        /* UI Elements */
+        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px #000; pointer-events: none; z-index: 10; }
+        .btn-round {
+            position: absolute; top: 20px; background: rgba(0,0,0,0.5);
             border: 2px solid white; color: white; border-radius: 50%; cursor: pointer;
             font-size: 20px; width: 45px; height: 45px; display: flex;
-            align-items: center; justify-content: center; pointer-events: auto;
+            align-items: center; justify-content: center; pointer-events: auto; z-index: 20;
         }
+        #mute-btn { right: 20px; }
+        #pause-btn { right: 75px; }
         
-        /* Stamina Bar */
+        #pause-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); color: white; align-items: center; 
+            justify-content: center; font-size: 3rem; font-weight: bold; z-index: 15;
+        }
+
         .bar-container { width: 200px; height: 15px; background: #333; border: 2px solid #fff; margin-top: 5px; }
         #stamina-bar { width: 100%; height: 100%; background: #00FF00; transition: width 0.1s; }
         
-        /* Level Up Animation */
-        #level-up {
-            position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 3rem; color: gold; font-weight: bold; text-shadow: 0 0 20px orange;
-            opacity: 0; pointer-events: none;
-        }
-        .animate-pop { animation: popAndFade 2s forwards; }
-        @keyframes popAndFade {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
-        }
-
-        /* Game Over Screen */
         #game-over { 
             display: none; position: absolute; top: 50%; left: 50%; 
             transform: translate(-50%, -50%); text-align: center; 
-            background: rgba(0,0,0,0.9); color: white; padding: 40px; border-radius: 20px; border: 4px solid gold;
+            background: rgba(0,0,0,0.9); color: white; padding: 40px; 
+            border-radius: 20px; border: 4px solid gold; z-index: 30;
         }
+        
+        #version-tag { position: absolute; bottom: 60px; right: 10px; color: rgba(255,255,255,0.6); font-size: 12px; }
         button { padding: 15px 30px; font-size: 1.2rem; cursor: pointer; background: gold; border: none; border-radius: 10px; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
@@ -52,8 +47,10 @@
         <div class="bar-container"><div id="stamina-bar"></div></div>
     </div>
 
-    <div id="mute-btn" onclick="toggleMute()">🔊</div>
-    <div id="level-up">LEVEL UP!</div>
+    <div id="pause-btn" class="btn-round" onclick="togglePause()">⏸</div>
+    <div id="mute-btn" class="btn-round" onclick="toggleMute()">🔊</div>
+    <div id="pause-overlay">PAUSED</div>
+    <div id="version-tag">v1.1.0</div>
 
     <div id="game-over">
         <h1 id="status-title">GAME OVER!</h1>
@@ -68,7 +65,8 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score'), highScoreEl = document.getElementById('highScore');
 const timerEl = document.getElementById('timer'), staminaBar = document.getElementById('stamina-bar');
-const gameOverScreen = document.getElementById('game-over'), levelUpEl = document.getElementById('level-up');
+const gameOverScreen = document.getElementById('game-over');
+const pauseOverlay = document.getElementById('pause-overlay');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -80,7 +78,7 @@ const treatImg = new Image(); treatImg.src = 'https://cdn-icons-png.flaticon.com
 const barkSound = new Audio('https://codesandbox.io/api/v1/sandboxes/f8z7l/assets/bark.mp3');
 
 // State
-let score = 0, timeLeft = 60, gameActive = true, power = 0, isPoweringUp = false, isMuted = false;
+let score = 0, timeLeft = 60, gameActive = true, power = 0, isPoweringUp = false, isMuted = false, isPaused = false;
 let highStored = localStorage.getItem('fetchHighScore') || 0;
 highScoreEl.innerText = highStored;
 
@@ -94,15 +92,15 @@ function toggleMute() {
     document.getElementById('mute-btn').innerText = isMuted ? '🔇' : '🔊';
 }
 
-function showLevelUp() {
-    levelUpEl.classList.remove('animate-pop');
-    void levelUpEl.offsetWidth; 
-    levelUpEl.classList.add('animate-pop');
-    if (!isMuted && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+function togglePause() {
+    if (!gameActive) return;
+    isPaused = !isPaused;
+    document.getElementById('pause-btn').innerText = isPaused ? '▶️' : '⏸';
+    pauseOverlay.style.display = isPaused ? 'flex' : 'none';
 }
 
 const countdown = setInterval(() => {
-    if (gameActive) {
+    if (gameActive && !isPaused) {
         timeLeft--; timerEl.innerText = timeLeft;
         if (timeLeft <= 0) endGame();
     }
@@ -110,7 +108,6 @@ const countdown = setInterval(() => {
 
 function endGame() {
     gameActive = false;
-    clearInterval(countdown);
     if (!isMuted && navigator.vibrate) navigator.vibrate([200, 100, 200]);
     if (score > highStored) {
         localStorage.setItem('fetchHighScore', score);
@@ -129,11 +126,19 @@ function spawnTreat() {
 
 function draw() {
     if (!gameActive) return;
+    
+    if (!isPaused) {
+        update();
+    }
+    
+    render();
+    requestAnimationFrame(draw);
+}
+
+function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Obstacle
-    obstacle.x += obstacle.speed * obstacle.dir;
-    if (obstacle.x > canvas.width - 200 || obstacle.x < 300) obstacle.dir *= -1;
     ctx.fillStyle = '#1e5d1e';
     ctx.beginPath(); ctx.arc(obstacle.x + 35, obstacle.y + 35, 35, 0, Math.PI * 2); ctx.fill();
 
@@ -149,18 +154,21 @@ function draw() {
 
     // Dog
     ctx.save();
-    let currentSpeed = dog.stamina > 25 ? dog.baseSpeed : 3;
     if (dog.state === 'returning') {
         ctx.translate(dog.x + dog.w, dog.y); ctx.scale(-1, 1);
         ctx.drawImage(dogImg, 0, 0, dog.w, dog.h);
     } else { ctx.drawImage(dogImg, dog.x, dog.y, dog.w, dog.h); }
     ctx.restore();
-
-    update(currentSpeed);
-    requestAnimationFrame(draw);
 }
 
-function update(speed) {
+function update() {
+    let speed = dog.stamina > 25 ? dog.baseSpeed : 3;
+
+    // Obstacle Movement
+    obstacle.x += obstacle.speed * obstacle.dir;
+    if (obstacle.x > canvas.width - 200 || obstacle.x < 300) obstacle.dir *= -1;
+
+    // Ball Physics
     if (ball.active) {
         ball.vy += 0.5; ball.x += ball.vx; ball.y += ball.vy;
         if (ball.y > canvas.height - 100) {
@@ -169,6 +177,7 @@ function update(speed) {
         }
     }
 
+    // Dog Logic
     if (dog.state !== 'idle') {
         dog.stamina -= 0.15;
         if (treat.active && dog.x + dog.w > treat.x && dog.x < treat.x + treat.w) {
@@ -188,11 +197,10 @@ function update(speed) {
             dog.x -= speed; ball.x = dog.x + 20; ball.y = dog.y + 30;
             if (dog.x <= 80) {
                 dog.state = 'idle'; score++; scoreEl.innerText = score;
-                obstacle.speed += 0.4; 
-                if (score % 10 === 0) showLevelUp();
-                spawnTreat(); resetBall();
+                obstacle.speed += 0.4; spawnTreat(); resetBall();
             }
         }
+        // Jumping
         if (dog.x + dog.w > obstacle.x && dog.x < obstacle.x + obstacle.w) {
             if (dog.y !== canvas.height - 250 && !isMuted && navigator.vibrate) navigator.vibrate(10);
             dog.y = canvas.height - 250;
@@ -205,7 +213,7 @@ function update(speed) {
 
 function resetBall() { ball.x = 80; ball.y = canvas.height - 100; ball.active = false; }
 
-window.onmousedown = () => { if(gameActive && dog.state === 'idle') isPoweringUp = true; };
+window.onmousedown = () => { if(gameActive && !isPaused && dog.state === 'idle') isPoweringUp = true; };
 window.onmouseup = () => {
     if (isPoweringUp) { ball.vx = power * 1.5; ball.vy = -power * 1.2; ball.active = true; }
     isPoweringUp = false; power = 0;
